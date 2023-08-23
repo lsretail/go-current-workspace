@@ -466,19 +466,20 @@ function New-AlPackage
 function Get-AlProjectDependencies
 {
     param(
-    [Parameter(Mandatory)]
-    $ProjectDir,
-    $BranchName,
-    $Target,
-    [hashtable] $Variables,
-    $PackageCacheDir,
-    $AssemblyProbingDir,
-    [Array] $CompileModifiers,
-    [string[]] $SkipPackageId = @(),
-    $Server,
-    [switch] $ClearDirs,
-    [switch] $Force,
-    [switch] $RunALCops
+        [Parameter(Mandatory)]
+        $ProjectDir,
+        $BranchName,
+        $Target,
+        [hashtable] $Variables,
+        $PackageCacheDir,
+        $AssemblyProbingDir,
+        [Array] $CompileModifiers,
+        [Array] $CompileOverride,
+        [string[]] $SkipPackageId = @(),
+        $Server,
+        [switch] $ClearDirs,
+        [switch] $Force,
+        [switch] $RunALCops
     )
 
     $Verbose = [bool]$PSBoundParameters["Verbose"]
@@ -538,6 +539,15 @@ function Get-AlProjectDependencies
 
         Write-Verbose "Compile Modifiers:"
         $CompileModifiers | Format-Table -AutoSize | Out-String | Write-Verbose
+    }
+
+    foreach ($Override in $CompileOverride)
+    {
+        $Dependency = $ModifiedDependencies | Where-Object { $_.Id -eq $Override.Id }
+        if ($Dependency)
+        {
+            $Dependency.Version = $Override.Version
+        }
     }
 
     $ModifiedDependencies = $ModifiedDependencies | Where-Object { !$SkipPackageId.Contains($_.Id) }
@@ -750,6 +760,8 @@ function Invoke-ProjectBuild
         $AllCompileModifiers = ,@(@())
     }
 
+    $CompileOverride = Get-ProjectFileCompileModifiers -Path (Get-GocProjectFilePath -ProjectDir $Projects[$AppId].ProjectDir) -Property 'CompileOverride' @Arguments -Idx 0
+
     # Arguments for Get-AlProjectDependencies.
     $Arguments += @{
         ProjectDir = $Project.ProjectDir
@@ -803,6 +815,7 @@ function Invoke-ProjectBuild
     {
         Get-AlProjectDependencies @Arguments `
             -CompileModifiers $CompileModifiers `
+            -CompileOverride $CompileOverride `
             -SkipPackageId $DependencyPackageId `
             -PackageCacheDir $AlPackagesDir `
             -AssemblyProbingDir $NetPackagesDir `

@@ -158,23 +158,27 @@ function Get-ProjectFileCompileModifiers
         [string] $Target,
         [string] $BranchName,
         [hashtable] $Variables,
+        [ValidateSet('CompileModifiers', 'CompileOverride')]
+        [string] $Property = 'CompileModifiers',
         $Idx = $null
     )
     $ProjectDir = Split-Path $Path -Parent
     $ProjectFile = Get-Content -Path $Path -Raw | ConvertFrom-Json
 
-    if (!($ProjectFile.CompileModifiers))
+    $Modifiers = $ProjectFile.$Property
+
+    if (!$Modifiers)
     {
         return
     }
 
     $ResolveContainer = Get-ResolveContainer -ProjectDir $ProjectDir -ProjectFile $ProjectFile -Target $Target -BranchName $BranchName -Variables $Variables
 
-    if (($ProjectFile.compileModifiers | Select-Object -First 1) -is [array])
+    if (($Modifiers | Select-Object -First 1) -is [array])
     {
         $CurrIdx = -1;
         $Entries = @()
-        foreach ($CompileModifiers in $ProjectFile.compileModifiers)
+        foreach ($CompileModifiers in $Modifiers)
         {
             $CurrIdx++
             if (($null -ne $Idx) -and $Idx -ne $CurrIdx)
@@ -183,7 +187,7 @@ function Get-ProjectFileCompileModifiers
             }
             $Packages = New-Object -TypeName System.Collections.ArrayList
             $Packages.AddRange($CompileModifiers) | Out-Null
-            Resolve-PackagesVersions -Packages $Packages @ResolveContainer
+            Resolve-PackagesVersions -Packages $Packages @ResolveContainer -IgnoreMissingTarget
             if ($Packages.Count -gt 0 -and $null -ne $Idx)
             {
                 return , $Packages.ToArray()
@@ -205,8 +209,8 @@ function Get-ProjectFileCompileModifiers
     elseif (($null -ne $Idx) -and $Idx -eq 0)
     {
         $Packages = New-Object -TypeName System.Collections.ArrayList
-        $Packages.AddRange($ProjectFile.compileModifiers) | Out-Null
-        Resolve-PackagesVersions -Packages $Packages @ResolveContainer
+        $Packages.AddRange($Modifiers) | Out-Null
+        Resolve-PackagesVersions -Packages $Packages @ResolveContainer -IgnoreMissingTarget
         $Packages.ToArray()
     }
     else
@@ -465,7 +469,8 @@ function Resolve-PackagesVersions
         $ProjectDir,
         $Target,
         $BranchName,
-        $BranchToLabelMap
+        $BranchToLabelMap,
+        [switch] $IgnoreMissingTarget
     )
 
     $ToRemove = @()
@@ -478,7 +483,7 @@ function Resolve-PackagesVersions
             $Package.Path = [IO.Path]::Combine($ProjectDir, $Package.Path)
             continue
         }
-        $Package.Version = Resolve-Version -Version $Package.Version -ProjectVariables $ProjectVariables -ResolveCache $ResolveCache -ProjectDir $ProjectDir -Target $Target -BranchName $BranchName -BranchToLabelMap $BranchToLabelMap -PackageId $Package.id
+        $Package.Version = Resolve-Version -Version $Package.Version -ProjectVariables $ProjectVariables -ResolveCache $ResolveCache -ProjectDir $ProjectDir -Target $Target -BranchName $BranchName -BranchToLabelMap $BranchToLabelMap -PackageId $Package.id -IgnoreMissingTarget:$IgnoreMissingTarget
 
         if ($null -eq $Package.Version)
         {
@@ -593,6 +598,7 @@ function Resolve-Version
         $Target,
         $BranchName,
         $BranchToLabelMap,
+        [switch] $IgnoreMissingTarget,
         [Parameter(ValueFromRemainingArguments)]
         $Remaning
     )
@@ -610,7 +616,7 @@ function Resolve-Version
     }
     else
     {
-        return Resolve-VersionWithFunction -VersionValue $Version -Target $Target -ProjectDir $ProjectDir -PackageId $PackageId -BranchName $BranchName -BranchToLabelMap $BranchToLabelMap -ResolveCache $ResolveCache -ProjectVariables $ProjectVariables
+        return Resolve-VersionWithFunction -VersionValue $Version -Target $Target -ProjectDir $ProjectDir -PackageId $PackageId -BranchName $BranchName -BranchToLabelMap $BranchToLabelMap -ResolveCache $ResolveCache -ProjectVariables $ProjectVariables -IgnoreMissingTarget $IgnoreMissingTarget
     }
 }
 
@@ -651,7 +657,8 @@ function Resolve-VersionWithFunction
         $BranchName,
         $BranchToLabelMap,
         [hashtable] $ProjectVariables,
-        [hashtable] $ResolveCache
+        [hashtable] $ResolveCache,
+        [switch] $IgnoreMissingTarget
     )
 
     if ($VersionValue.GetType() -eq [string])
@@ -695,13 +702,20 @@ function Resolve-VersionWithFunction
         {
             throw "Could not resolve version for variable `"$($VersionValue)`"."
         }
-        if ($Target)
+        if (!$IgnoreMissingTarget)
         {
-            throw "Package `"$($PackageId)`" does not have a version for selected target `"$Target`" nor `"default`"."
+            if ($Target)
+            {
+                throw "Package `"$($PackageId)`" does not have a version for selected target `"$Target`" nor `"default`"."
+            }
+            else
+            {
+                throw "Package `"$($PackageId)`" does not have a version for target `"default`"."
+            }
         }
         else
         {
-            throw "Package `"$($PackageId)`" does not have a version for target `"default`"."
+            return $null
         }
     }
 }
