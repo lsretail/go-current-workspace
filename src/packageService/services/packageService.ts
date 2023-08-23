@@ -163,27 +163,6 @@ export class PackageService implements IWorkspaceService
         let assemblyProbingDir = this.getFirstRelativePath(alConfig.assemblyProbingPaths, '.netpackages');
 
         let dllsLocked = await this._packagesPsService.testNetPackagesLocked(projectDir, assemblyProbingDir);
-        if (dllsLocked && this._alExtensionService.isActive)
-        {
-            try
-            {
-                await this._alExtensionService.stop();
-            }
-            catch
-            {
-                // ignore
-            }
-            
-            let count = 0
-            while (count < 10)
-            {
-                await this.delay(500);
-                let newLock = await this._packagesPsService.testNetPackagesLocked(projectDir, assemblyProbingDir);
-                if (!newLock)
-                    break;
-                count ++
-            }
-        }
 
         let output = await this._packagesPsService.getDependencies(
             projectDir, 
@@ -194,9 +173,6 @@ export class PackageService implements IWorkspaceService
             assemblyProbingDir,
             skipPackages
         );
-
-        if (dllsLocked && this._alExtensionService.isActive)
-            await this._alExtensionService.start();
 
         return {output: output, dllsLocked: dllsLocked};
     }

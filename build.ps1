@@ -130,7 +130,7 @@ $OutputDir = Join-Path $PSScriptRoot 'PackageOutput'
 Import-Module GoCurrentServer
 $Package = @{
     'Id' = 'ls-update-service-workspace'
-    'Name' = "LS Update Service Workspace"
+    'Name' = "Update Service Workspace"
     'Version' = $Version
     'IncludePaths' = @(
         (Get-Item (Join-Path $PSScriptRoot "*.vsix")),
