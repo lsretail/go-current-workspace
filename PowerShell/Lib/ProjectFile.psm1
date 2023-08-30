@@ -4,7 +4,10 @@ Import-Module GoCurrent
 Import-Module (Join-Path $PSScriptRoot '_Utils.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'Branch.psm1') -Force
 
-$_VariableRegex = [regex]::new('\$\{(?<Name>[a-zA-Z0-9]*)(:(?<Func>[a-zA-Z0-9]+)(\((?<Args>[a-zA-Z0-9,]*)\))?)?\}')
+$_FuncPattern = '(:(?<Func>[a-zA-Z0-9]+)(\((?<Args>[a-zA-Z0-9,]*)\))?)'
+$_FuncRegex = [regex]::new($_FuncPattern)
+$_VariableRegex = [regex]::new("\$\{(?<Name>[a-zA-Z0-9]*)(?<Funcs>$_FuncPattern*)?\}")
+
 $_AlAppVersion = 'AlAppVersion'
 $_AlAppName = 'AlAppName'
 $_AlAppPublisher = 'AlAppPublisher'
@@ -546,16 +549,20 @@ function Resolve-VariablesInString
     {
         $Match = $MatchList[$Idx]
         $VariableName = $Match.Groups['Name'].Value
-        if ($Match.Groups['Func'])
+        
+        $Functions = @()
+        if ($Match.Groups['Funcs'].Value)
         {
-            $FuncName = $Match.Groups['Func'].Value
+            $FuncMatches = $_FuncRegex.Matches($Match.Groups['Funcs'].Value)
+            foreach ($FuncMatch in $FuncMatches)
+            {
+                $Functions += @{
+                    Name = $FuncMatch.Groups['Func'].Value
+                    Args = $FuncMatch.Groups['Args'].Value.Split(',')
+                }
+            }
         }
 
-        $ArgsList = @()
-        if ($Match.Groups['Args'])
-        {
-            $ArgsList = $Match.Groups['Args'].Value.Split(',')
-        }
         $Replacement = $null
 
         if ($ResolveCache.Keys -icontains $VariableName)
@@ -591,25 +598,53 @@ function Resolve-VariablesInString
             $ResolveCache[$VariableName] = $Replacement
         }
 
-        # Resolve and execute a function of a function, ${variable:function}
+        # Resolve and execute a function of a function, ${variable:function} or ${variable:function:function2}
         if ($null -ne $Replacement)
         {
             $FromIdx = $Match.Index + $Match.Length
-            if ($FuncName -ieq 'Parts')
+            foreach ($Function in $Functions)
             {
-                $Replacement = Get-VersionParts -Version $Replacement @ArgsList
-            }
-            if ($FuncName -ieq 'PreReleaseLabel')
-            {
-                $Replacement = ConvertTo-PreReleaseLabel -Label $Replacement
-            }
-            if ($FuncName -ieq 'BranchLabel')
-            {
-                $Replacement = ConvertTo-BranchPreReleaseLabel -BranchName $Replacement -BranchToLabelMap $BranchToLabelMap
-            }
-            if ($FuncName -ieq 'MaxLength')
-            {
-                $Replacement = Get-MaxLength -Value $Replacement @ArgsList
+                $ArgsList = $Function.Args
+                if ($Function.Name -ieq 'Parts')
+                {
+                    $Replacement = Get-VersionParts -Version $Replacement @ArgsList
+                }
+                if ($Function.Name -ieq 'PreReleaseLabel')
+                {
+                    $Replacement = ConvertTo-PreReleaseLabel -Label $Replacement
+                }
+                if ($Function.Name -ieq 'BranchLabel')
+                {
+                    $Replacement = ConvertTo-BranchPreReleaseLabel -BranchName $Replacement -BranchToLabelMap $BranchToLabelMap
+                }
+                if ($Function.Name -ieq 'MaxLength')
+                {
+                    $Replacement = Get-MaxLength -Value $Replacement @ArgsList
+                }
+                if ($Function.Name -ieq 'NextMajor')
+                {
+                    $Replacement = Get-NextMajor -Version $Replacement
+                }
+                if ($Function.Name -ieq 'CurrentMajor')
+                {
+                    $Replacement = Get-CurrentMajor -Version $Replacement
+                }
+                if ($Function.Name -ieq 'NextMinor')
+                {
+                    $Replacement = Get-NextMinor -Version $Replacement
+                }
+                if ($Function.Name -ieq 'CurrentMinor')
+                {
+                    $Replacement = Get-CurrentMinor -Version $Replacement
+                }
+                if ($Function.Name -ieq 'NextPatch')
+                {
+                    $Replacement = Get-NextPatch -Version $Replacement
+                }
+                if ($Function.Name -ieq 'NextPreRelease')
+                {
+                    $Replacement = Get-NextPreRelease -Version $Replacement
+                }
             }
             $Value = $Value.Substring(0, $Match.Index) + $Replacement + $Value.Substring($FromIdx, $Value.Length - $FromIdx)
         }

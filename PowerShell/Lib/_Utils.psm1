@@ -155,6 +155,173 @@ function Get-VersionParts
     return $Version
 }
 
+function Get-NextMajor
+{
+    param(
+        [Parameter(Mandatory)]
+        [string] $Version
+    )
+
+    $Version = $Version.Split('-') | Select-Object -First 1
+
+    try
+    {
+        $versionArray = $Version.Split('.') | ForEach-Object { [int]$_ }    
+    }
+    catch
+    {
+        return "Invalid version: $Version"
+    }
+
+    $versionArray[0] += 1
+
+    for ($idx = 1; $idx -lt $versionArray.Length; $idx++)
+    {
+        $versionArray[$idx] = 0
+    }
+    return $versionArray -join '.'
+}
+
+function Get-CurrentMajor
+{
+    param(
+        [Parameter(Mandatory)]
+        [string] $Version
+    )
+
+    $Version = $Version.Split('-') | Select-Object -First 1
+
+    try
+    {
+        $versionArray = $Version.Split('.') | ForEach-Object { [int]$_ }    
+    }
+    catch
+    {
+        return "Invalid version: $Version"
+    }
+
+    for ($idx = 1; $idx -lt $versionArray.Length; $idx++)
+    {
+        $versionArray[$idx] = 0
+    }
+    return $versionArray -join '.'
+}
+
+function Get-NextMinor
+{
+    param(
+        [Parameter(Mandatory)]
+        [string] $Version
+    )
+    
+    $Version = $Version.Split('-') | Select-Object -First 1
+
+    try
+    {
+        $versionArray = $Version.Split('.') | ForEach-Object { [int]$_ }    
+    }
+    catch
+    {
+        return "Invalid version: $Version"
+    }
+
+    if ($versionArray.Length -eq 1)
+    {
+        return $Version + '.1'
+    }
+
+    $versionArray[1] += 1
+
+    for ($idx = 2; $idx -lt $versionArray.Length; $idx++)
+    {
+        $versionArray[$idx] = 0
+    }
+    return $versionArray -join '.'
+}
+
+function Get-CurrentMinor
+{
+    param(
+        [Parameter(Mandatory)]
+        [string] $Version
+    )
+
+    $Version = $Version.Split('-') | Select-Object -First 1
+
+    try
+    {
+        $versionArray = $Version.Split('.') | ForEach-Object { [int]$_ }    
+    }
+    catch
+    {
+        return "Invalid version: $Version"
+    }
+
+    if ($versionArray.Length -eq 1)
+    {
+        return $Version + '.0'
+    }   
+
+    for ($idx = 2; $idx -lt $versionArray.Length; $idx++)
+    {
+        $versionArray[$idx] = 0
+    }
+    return $versionArray -join '.'
+}
+
+function Get-NextPatch
+{
+    param(
+        [Parameter(Mandatory)]
+        [string] $Version
+    )
+
+    $Version = $Version.Split('-') | Select-Object -First 1
+    
+    try
+    {
+        $versionArray = $Version.Split('.') | ForEach-Object { [int]$_ }    
+    }
+    catch
+    {
+        return "Invalid version: $Version"
+    }
+
+    if ($versionArray.Length -eq 2)
+    {
+        return $Version + '.1'
+    }
+
+    $versionArray[2] += 1
+
+    for ($idx = 3; $idx -lt $versionArray.Length; $idx++)
+    {
+        $versionArray[$idx] = 0
+    }
+    return $versionArray -join '.'
+}
+
+function Get-NextPreRelease
+{
+    param(
+        [Parameter(Mandatory)]
+        [string] $Version
+    )
+    
+    if (!$Version.Contains('-'))
+    {
+        return $Version + '-0'
+    }
+
+    $charArray = $Version.ToCharArray()
+
+    $ascii = [int]$charArray[-1]
+    $ascii++
+
+    $charArray[-1] = [char]$ascii
+    return $charArray -join ''
+}
+
 function Get-MaxLength
 {
     param(
