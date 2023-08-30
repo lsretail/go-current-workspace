@@ -2,7 +2,7 @@
     "name": "ls-update-service-workspace",
     "displayName": "LS Retail Update Service Workspace",
     "description": "LS Retail Update Service Workspace brings you the power of LS Update Service to your workspace in Visual Studio Code.",
-    "version": "1.6.3-developer",
+    "version": "1.7.0-developer",
     "publisher": "lsretail",
     "repository": {
         "type": "git",

@@ -7,24 +7,24 @@
     "properties": {
         "id": {
             "type": "string",
-            "description": "Specify the Go Current package ID.",
+            "description": "Specify the package ID.",
             "minLength": 1
         },
         "name": {
             "type": "string",
-            "description": "Specify the Go Current package name.",
+            "description": "Specify the package name.",
             "minLength": 1
         },
         "displayName": {
             "type": "string",
-            "description": "Specify the Go Current package display name."
+            "description": "Specify the package display name."
         },
         "description": {
             "type": "string",
-            "description": "Specify the Go Current package description."
+            "description": "Specify the package description."
         },
         "version": {
-            "description": "Specify the Go Current package version.",
+            "description": "Specify the package version.",
             "oneOf":[
                 {
                     "$ref": "./sharedDefinitions.json#/definitions/version"
@@ -45,6 +45,18 @@
             "type": "boolean",
             "description": "Specify if AL app requires Business Central service tier assemblies for compilation.",
             "default": false
+        },
+        "alAppSourceCopVersionQuery": {
+            "description": "Specify the version of the AL App Source Cop to use for validation.",
+            "default": "^ <${alAppVersion:Parts(3)} | <${alAppVersion:Parts(3)} *-rc",
+            "oneOf":[
+                {
+                    "$ref": "./sharedDefinitions.json#/definitions/version"
+                },
+                {
+                    "$ref": "./sharedDefinitions.json#/definitions/versionTargetSimple"
+                }
+            ]
         },
         "parameters": {
             "type": "array",
@@ -192,6 +204,15 @@
                 "type": "string",
                 "default": "dev.${currentBranch}"
             }
+        },
+        "branchToPreReleaseStrategy": {
+            "type": "string",
+            "description": "Specifies a strategy to determine the pre-release label for a branch.",
+            "examples": [
+                "legacy",
+                "alpha-beta-rc-release",
+                "lsc-dev"
+            ]
         },
         "devTarget": {
             "description": "Specify target configuration available for this group.",

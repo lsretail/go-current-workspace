@@ -9,11 +9,14 @@ function ConvertTo-BranchPreReleaseLabel
         .PARAMETER BranchName
             Branch name to convert.
         
-        .PARAMETER BranchToLabelMap
+        .PARAMETER Map
             A hashtable that defines the conversion map.
             Key: Specify a branch name.
             Value: Specify output string, %BRANCHNAME% will be replace with the name specified with -BranchName. 
             Adding "%BRANCHNAME%" as key will catch all branches not defined in the hashtable map.
+        
+        .PARAMETER Strategy
+            Specify a strategy to use for branch to pre-release label conversion.
 
         .EXAMPLE
             PS> ConvertTo-BranchPreReleaseLabel -BranchName 'master'
@@ -23,36 +26,87 @@ function ConvertTo-BranchPreReleaseLabel
             dev.branch.qwerty
     #>
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory)]
         $BranchName,
-        [hashtable] $BranchToLabelMap
+        [Alias('BranchToLabelMap')]
+        [hashtable] $Map,
+        [string] $Strategy
     )
 
-    if (!$BranchToLabelMap)
+    if (!$Map)
     {
-        $BranchToLabelMap = @{
-            "master" = "dev.0.%BRANCHNAME%"
-            "%BRANCHNAME%" = "dev.branch.%BRANCHNAME%"
-        }
+        $Map = Get-BranchPreReleaseLabelMap -Strategy $Strategy
     }
 
-    if ($BranchToLabelMap.Contains($BranchName))
+    if ($Map.Contains($BranchName))
     {
-        $Label = $BranchToLabelMap[$BranchName]
+        $Label = $Map[$BranchName]
     }
-    elseif (!$BranchToLabelMap.Contains("%BRANCHNAME%"))
+    elseif (!$Map.Contains("%BRANCHNAME%"))
     {
         throw "Specified map must include `"%BRANCHNAME%`" key."
     }
     else 
     {
-        $Label = $BranchToLabelMap["%BRANCHNAME%"]
+        $Label = $Map["%BRANCHNAME%"]
+    }
+
+    if (!$Label)
+    {
+        return $null
     }
 
     $BranchName = $BranchName.ToLower()
     $Label = $Label.Replace("%BRANCHNAME%", $BranchName)
     $Label = [regex]::Replace($Label, "[^a-zA-Z0-9-.+]", "-")  
     return [regex]::Replace($Label, "[-]{2,}", "-").ToLower()
+}
+
+function Get-BranchPreReleaseLabelMap
+{
+    <#
+        .SYNOPSIS
+            Get a hashtable that defines the conversion map for branch to pre-release label conversion.
+        
+        .PARAMETER Strategy
+            Specify a strategy to use for branch to pre-release label conversion.
+    #>
+    param(
+        [string] $Strategy
+    )
+
+    if (!$Strategy)
+    {
+        $Strategy = 'alpha-beta-rc-release'
+    }
+
+    if ($Strategy -eq 'lsc-dev')
+    {
+        return @{
+            "master" = "alpha.0"
+            "develop" = "alpha.1"
+            "%BRANCHNAME%" = "alpha-branch.%BRANCHNAME%"
+        }
+    }
+    elseif ($Strategy -eq 'alpha-beta-rc-release')
+    {
+        return @{
+            "master" = "alpha"
+            "main" = "alpha"
+            "beta" = "beta"
+            "rc" = "rc"
+            "release" = $null
+            "%BRANCHNAME%" = "alpha-branch.%BRANCHNAME%"
+        }
+    }
+    elseif ($Strategy -eq 'legacy')
+    {
+        return @{
+            "master" = "dev.0.%BRANCHNAME%"
+            "%BRANCHNAME%" = "dev.branch.%BRANCHNAME%"
+        }
+    }
+    throw "Unknown strategy for branch pre-release: $Strategy"
 }
 
 function ConvertTo-PreReleaseLabel
@@ -72,7 +126,7 @@ function ConvertTo-PreReleaseLabel
             alpha
     #>
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory)]
         [string] $Label
     )
 
@@ -82,10 +136,13 @@ function ConvertTo-PreReleaseLabel
 function ConvertTo-BranchPriorityPreReleaseFilter
 {
     param(
+        [Parameter(Mandatory)]
         [Array] $BranchName,
-        $BranchToLabelMap
+        [Alias('BranchToLabelMap')]
+        $Map,
+        $Strategy
     )
-
+                                         
     $Labels = @()
     foreach ($Branch in $BranchName)
     {
@@ -93,7 +150,19 @@ function ConvertTo-BranchPriorityPreReleaseFilter
         {
             continue
         }
-        $Label = ConvertTo-BranchPreReleaseLabel -BranchName $Branch.Trim() -BranchToLabelMap $BranchToLabelMap
+
+        if ($Branch -match '\d+\.\d+(\.\d+(\.\d+)?)?|\*-.*')
+        {
+            $Labels += $Branch
+            continue
+        }
+
+        $Label = ConvertTo-BranchPreReleaseLabel -BranchName $Branch.Trim() -Map $Map -Strategy $Strategy
+        if (!$Label)
+        {
+            $Labels += '>=0.0.1'
+            continue
+        }
         $Label = $Label.Trim()
         $Filter = "*-$Label."
         if (!$Labels.Contains($Filter))

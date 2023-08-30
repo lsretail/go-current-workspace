@@ -1,6 +1,5 @@
 $ErrorActionPreference = 'stop'
 
-Import-Module GoCurrent
 Import-Module (Join-Path $PSScriptRoot '_Utils.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'Branch.psm1') -Force
 
@@ -60,7 +59,7 @@ function Get-ProjectFile
 
     $ResolveContainer = Get-ResolveContainer -ProjectDir $ProjectDir -ProjectFile $ProjectFile -Target $Target -BranchName $BranchName -Variables $Variables
 
-    $ResolveAsVariables = @('id', 'name', 'displayName', 'description', 'outputDir','alAppSourceCopVersionQuery')
+    $ResolveAsVariables = @('id', 'name', 'displayName', 'description', 'outputDir')
     $CopyProperties = @('instance', 'substituteFor', 'windowsUpdateSensitive', 'alIncludeServerAssemblies')
 
     $Result = @{}
@@ -84,6 +83,11 @@ function Get-ProjectFile
     if ($ProjectFile.version)
     {
         $Result.Version = Resolve-Version -Version $ProjectFile.version @ResolveContainer
+    }
+
+    if ($ProjectFile.alAppSourceCopVersionQuery)
+    {
+        $Result.alAppSourceCopVersionQuery = Resolve-Version -Version $ProjectFile.alAppSourceCopVersionQuery @ResolveContainer
     }
 
     if ($ProjectFile.Dependencies)
@@ -400,6 +404,10 @@ function GetBranchLabelMap
             $BranchToPreReleaseLabelMap[$Name] = $_.Value -ireplace [regex]::Escape('${currentBranch}'), '%BRANCHNAME%'
         }
     }
+    elseif ($ProjectFile.branchToPreReleaseStrategy)
+    {
+        $BranchToPreReleaseLabelMap = Get-BranchPreReleaseLabelMap -Strategy $ProjectFile.branchToPreReleaseStrategy
+    }
 
     $BranchToPreReleaseLabelMap
 }
@@ -613,9 +621,19 @@ function Resolve-VariablesInString
                 {
                     $Replacement = ConvertTo-PreReleaseLabel -Label $Replacement
                 }
+                if ($Function.Name -ieq 'PreReleaseFilter')
+                {
+                    $Replacement = ConvertTo-PreReleaseLabel -Label $Replacement
+                    $Replacement = "*-$Replacement."
+                }
                 if ($Function.Name -ieq 'BranchLabel')
                 {
                     $Replacement = ConvertTo-BranchPreReleaseLabel -BranchName $Replacement -BranchToLabelMap $BranchToLabelMap
+                }
+                if ($Function.Name -ieq 'BranchFilter')
+                {
+                    $Replacement = ConvertTo-BranchPreReleaseLabel -BranchName $Replacement -BranchToLabelMap $BranchToLabelMap
+                    $Replacement = "*-$Replacement."
                 }
                 if ($Function.Name -ieq 'MaxLength')
                 {
@@ -769,7 +787,8 @@ function Resolve-VersionWithFunction
     }
     elseif ($null -ne $VersionValue.BranchPriorityFilter)
     {
-        return Resolve-VariableBranchFilter -BranchName $BranchName -BranchPriorityFilter $VersionValue.BranchPriorityFilter -BranchToLabelMap $BranchToLabelMap
+        $Branches = $VersionValue.BranchPriorityFilter | ForEach-Object { Resolve-VariablesInString -Value $_ @ResolveContainer }
+        return Resolve-VariableBranchFilter -BranchName $BranchName -BranchPriorityFilter $Branches -BranchToLabelMap $BranchToLabelMap
     }
     elseif ($null -ne $VersionValue.closestCandidateBranches)
     {

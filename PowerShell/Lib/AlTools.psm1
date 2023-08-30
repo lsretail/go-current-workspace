@@ -1,6 +1,5 @@
 $ErrorActionPreference = 'stop'
 
-Import-Module GoCurrent
 Import-Module (Join-Path $PSScriptRoot 'ProjectFile.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot '_Utils.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot '_ExportAppJsonFromApp.psm1') -Force
@@ -754,6 +753,7 @@ function Invoke-ProjectBuild
     }
 
     $AllCompileModifiers = Get-ProjectFileCompileModifiers -Path (Get-GocProjectFilePath -ProjectDir $Projects[$AppId].ProjectDir) @Arguments
+    $ProjectFile = Get-ProjectFile -Path (Get-GocProjectFilePath -ProjectDir $Projects[$AppId].ProjectDir) @Arguments
 
     if (!$AllCompileModifiers)
     {
@@ -792,7 +792,6 @@ function Invoke-ProjectBuild
         $AssemblyDir += (Join-Path $Projects[$AppId].ProjectDir '.netpackages')
     }
 
-
     if($RunALCops)
     {
         $AppSourceJsonPath = Join-Path $ProjectDir 'AppSourceCop.json'
@@ -809,7 +808,6 @@ function Invoke-ProjectBuild
             $RunALCops = $false
         }
     }
-
 
     foreach ($CompileModifiers in $AllCompileModifiers)
     {
