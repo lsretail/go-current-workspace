@@ -15,7 +15,7 @@ import Resources from "../resources";
 import { WorkspaceServiceProvider, WorkspaceContainerEvent } from "../workspaceService/services/workspaceServiceProvider";
 import * as util from 'util'
 import { PackageInfo } from "../interfaces/packageInfo";
-import { BaseUiService } from "./BaseUiService";
+import { BaseUiService } from "./baseUiService";
 import { WorkspaceHelpers } from "../helpers/workspaceHelpers";
 import { Logger } from "../interfaces/logger";
 import { DeploymentPayload } from "../models/deploymentPayload";
@@ -653,11 +653,11 @@ export class DeployUiService extends UiService
 
         const panel = vscode.window.createWebviewPanel(
             'projectFile',
-            'Resolved Go Current Project File',
+            'Resolved Project File',
             vscode.ViewColumn.One,
             {}
         );
         
-        panel.webview.html = '<pre>' + JSON.stringify(projectFileResolved, null, 4) + '<br>' + JSON.stringify(projectFileResolved, null, 4) +'</pre>';
+        panel.webview.html = '<pre>' + JSON.stringify(projectFileResolved, null, 4) +'</pre>';
     }   
 }

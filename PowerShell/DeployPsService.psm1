@@ -283,6 +283,7 @@ function Get-ResolvedProjectFile
         $BranchName
     )
     $ProjectFile = Get-ProjectFile -Path $ProjectFilePath -Target $Target -BranchName $BranchName
+    $ProjectFile.Variables = Get-ProjectFileVariables -Path $ProjectFilePath -Target $Target -BranchName $BranchName
     return (ConvertTo-Json $ProjectFile -Compress -Depth 100)
 }
 

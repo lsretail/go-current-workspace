@@ -159,6 +159,12 @@
                     },
                     {
                         "$ref": "./sharedDefinitions.json#/definitions/branchPriorityFilter"
+                    },
+                    {
+                        "$ref": "./sharedDefinitions.json#/definitions/resolvePackageVersion"
+                    },
+                    {
+                        "$ref": "./sharedDefinitions.json#/definitions/closestBranch"
                     }
                 ]
             }
@@ -181,7 +187,7 @@
         },
         "branchToPreReleaseLabelMap": {
             "required": ["${currentBranch}"],
-            "default": { "${currentBranch}": "dev.branch.${CurrentBranch}", "master": "dev.${currentBranch}" },
+            "default": { "${currentBranch}": "dev.branch.${currentBranch:branchLabel}", "master": "dev.0.${currentBranch}" },
             "additionalProperties": {
                 "type": "string",
                 "default": "dev.${currentBranch}"

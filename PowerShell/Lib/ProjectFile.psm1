@@ -289,6 +289,36 @@ function Get-ProjectFileTargets
     return $Targets | Sort-Object
 }
 
+function Get-ProjectFileVariables
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [Alias('ProjectFilePath')]
+        $Path,
+        [string] $Target,
+        [string] $BranchName,
+        [hashtable] $Variables    
+    )
+
+    $ProjectDir = Split-Path $Path -Parent
+    $ProjectFile = Get-Content -Path $Path -Raw | ConvertFrom-Json
+
+    if (!$ProjectFile.Variables)
+    {
+        return
+    }
+
+    $ResolveContainer = Get-ResolveContainer -ProjectDir $ProjectDir -ProjectFile $ProjectFile -Target $Target -BranchName $BranchName -Variables $Variables
+
+    $Variables = @{}
+
+    foreach ($Variable in $ProjectFile.Variables.PSObject.Properties)
+    {
+        $Variables[$Variable.Name] = Resolve-VariablesInString -Value "`$`{$($Variable.Name)`}" @ResolveContainer
+    }
+    return $Variables
+}
+
 function Get-ResolveContainer
 {
     param(
@@ -557,10 +587,11 @@ function Resolve-VariablesInString
         }
         elseif($VariableName.ToLower() -eq 'alAppSourceCopVersion'.ToLower())
         {
-            $Replacement = (get-content (join-path ((Get-Item $ProjectDir).Parent.FullName) 'AppSourceCop.json') | ConvertFrom-Json).Version
+            $Replacement = (Get-Content (Join-Path ((Get-Item $ProjectDir).Parent.FullName) 'AppSourceCop.json') | ConvertFrom-Json).Version
             $ResolveCache[$VariableName] = $Replacement
         }
 
+        # Resolve and execute a function of a function, ${variable:function}
         if ($null -ne $Replacement)
         {
             $FromIdx = $Match.Index + $Match.Length
@@ -661,9 +692,18 @@ function Resolve-VersionWithFunction
         [switch] $IgnoreMissingTarget
     )
 
+    $ResolveContainer = @{
+        ProjectVariables = $ProjectVariables
+        ResolveCache = $ResolveCache
+        ProjectDir = $ProjectDir
+        Target = $Target
+        BranchName = $BranchName
+        BranchToLabelMap = $BranchToLabelMap
+    }
+
     if ($VersionValue.GetType() -eq [string])
     {
-        return (Resolve-VariablesInString -Value $VersionValue -ProjectVariables $ProjectVariables -ResolveCache $ResolveCache -ProjectDir $ProjectDir -Target $Target -BranchName $BranchName -BranchToLabelMap $BranchToLabelMap)
+        return (Resolve-VariablesInString -Value $VersionValue @ResolveContainer)
     }
 
     if ($null -ne $VersionValue.AlAppId)
@@ -695,6 +735,38 @@ function Resolve-VersionWithFunction
     elseif ($null -ne $VersionValue.BranchPriorityFilter)
     {
         return Resolve-VariableBranchFilter -BranchName $BranchName -BranchPriorityFilter $VersionValue.BranchPriorityFilter -BranchToLabelMap $BranchToLabelMap
+    }
+    elseif ($null -ne $VersionValue.closestCandidateBranches)
+    {
+        Import-Module (Join-Path $PSScriptRoot 'Git.psm1')
+        Assert-GitIsRepository -RepositoryDir $ProjectDir
+        Assert-GitOnPath
+
+        if ($VersionValue.closestCandidateBranches -isnot [array])
+        {
+            throw 'The property "closestCandidateBranches" must contain array of branch names.'
+        }
+
+        $closestCandidateBranches = $VersionValue.closestCandidateBranches | ForEach-Object { Resolve-VariablesInString -Value $_ @ResolveContainer }
+        $ClosestToBranch = $BranchName
+        if ($VersionValue.closestToBranch)
+        {
+            $ClosestToBranch = Resolve-VariablesInString -Value $VersionValue.closestToBranch @ResolveContainer
+        }
+        return Get-FallbackBranch -BranchCandidates $closestCandidateBranches -BranchName $ClosestToBranch -RepositoryDir $ProjectDir
+    }
+    elseif ($null -ne $VersionValue.resolveVersionFromPackageId)
+    {
+        $VersionValue.resolvePackageId = Resolve-VariablesInString -Value $VersionValue.resolvePackageId @ResolveContainer
+        $VersionValue.resolvePackageVersion = Resolve-VariablesInString -Value $VersionValue.resolvePackageVersion @ResolveContainer
+        $VersionValue.resolveVersionFromPackageId = Resolve-VariablesInString -Value $VersionValue.resolveVersionFromPackageId @ResolveContainer
+
+        $Result = Get-GocUpdates -Id $VersionValue.resolvePackageId -Version $VersionValue.resolvePackageVersion | Where-Object { $_.Id -eq $VersionValue.resolveVersionFromPackageId} | Select-Object -First 1
+        if (!$Result)
+        {
+            return "ERROR: Could not resolve version for package `"$($VersionValue.resolveVersionFromPackageId)`" from `"$($VersionValue.resolvePackageId)`" v$($VersionValue.resolvePackageVersion)."
+        }
+        return $Result.Version
     }
     else
     {
