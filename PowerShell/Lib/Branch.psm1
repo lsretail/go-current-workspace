@@ -1,5 +1,8 @@
 $ErrorActionPreference = 'stop'
 
+$_AllowedPreReleasePattern = "[^a-zA-Z0-9-.+]"
+$_AllowedPreReleasePattern2 = "[a-zA-Z0-9-.+]"
+
 function ConvertTo-BranchPreReleaseLabel
 {
     <#
@@ -58,7 +61,7 @@ function ConvertTo-BranchPreReleaseLabel
 
     $BranchName = $BranchName.ToLower()
     $Label = $Label.Replace("%BRANCHNAME%", $BranchName)
-    $Label = [regex]::Replace($Label, "[^a-zA-Z0-9-.+]", "-")  
+    $Label = [regex]::Replace($Label, $_AllowedPreReleasePattern, "-")  
     return [regex]::Replace($Label, "[-]{2,}", "-").ToLower()
 }
 
@@ -130,7 +133,7 @@ function ConvertTo-PreReleaseLabel
         [string] $Label
     )
 
-    return [regex]::Replace($Label, "[^a-zA-Z0-9-.+]", "-")  
+    return [regex]::Replace($Label, $_AllowedPreReleasePattern, "-")  
 }
 
 function ConvertTo-BranchPriorityPreReleaseFilter
@@ -151,7 +154,7 @@ function ConvertTo-BranchPriorityPreReleaseFilter
             continue
         }
 
-        if ($Branch -match '\d+\.\d+(\.\d+(\.\d+)?)?|\*-.*')
+        if ($Branch -match "^[<>=]{1,2}\d+\.\d+(\.\d+(\.\d+)?)?(-$_AllowedPreReleasePattern2+)?$|\*-$_AllowedPreReleasePattern2+$")
         {
             $Labels += $Branch
             continue

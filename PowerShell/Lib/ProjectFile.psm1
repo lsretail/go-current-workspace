@@ -815,7 +815,12 @@ function Resolve-VersionWithFunction
         $VersionValue.resolvePackageVersion = Resolve-VariablesInString -Value $VersionValue.resolvePackageVersion @ResolveContainer
         $VersionValue.resolveVersionFromPackageId = Resolve-VariablesInString -Value $VersionValue.resolveVersionFromPackageId @ResolveContainer
 
-        $Result = Get-GocUpdates -Id $VersionValue.resolvePackageId -Version $VersionValue.resolvePackageVersion | Where-Object { $_.Id -eq $VersionValue.resolveVersionFromPackageId} | Select-Object -First 1
+        $Packages = @(
+            @{ Id = $VersionValue.resolvePackageId; Version = $VersionValue.resolvePackageVersion }
+            @{ Id = $VersionValue.resolveVersionFromPackageId; Version = '_' }
+        )
+
+        $Result = $Packages | Get-GocUpdates | Where-Object { $_.Id -eq $VersionValue.resolveVersionFromPackageId} | Select-Object -First 1
         if (!$Result)
         {
             return "ERROR: Could not resolve version for package `"$($VersionValue.resolveVersionFromPackageId)`" from `"$($VersionValue.resolvePackageId)`" v$($VersionValue.resolvePackageVersion)."

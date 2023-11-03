@@ -270,15 +270,16 @@ function Get-AlDevDependencies
 function Invoke-AlCompiler
 {
     param(
-    [Parameter(Mandatory)]
-    [string] $ProjectDir,
-    [Parameter(Mandatory)]
-    [string] $CompilerPath,
-    [Parameter(Mandatory)]
-    $OutputDir,
-    $AlPackagesDir = $null,
-    [Array] $AssemblyDir = $null,
-    [switch] $RunALCops
+        [Parameter(Mandatory)]
+        [string] $ProjectDir,
+        [Parameter(Mandatory)]
+        [string] $CompilerPath,
+        [Parameter(Mandatory)]
+        $OutputDir,
+        $AlPackagesDir = $null,
+        [Array] $AssemblyDir = $null,
+        [switch] $RunALCops,
+        [Array] $AlcArgumentList = @()
     )
     $AppJsonPath = Join-Path $ProjectDir 'app.json'
     $AppJson = Get-Content -Path $AppJsonPath -Raw | ConvertFrom-Json
@@ -334,6 +335,7 @@ function Invoke-AlCompiler
             }
         }
     }
+    $Arguments += $AlcArgumentList
 
     Write-Verbose "`"$CompilerPath`" $([string]::Join(' ', $Arguments))"
     $Output = & $CompilerPath @Arguments | Out-String
@@ -625,16 +627,17 @@ function Invoke-AlProjectCompile
 {
     [CmdletBinding()]
     param (
-    [Parameter(Mandatory, ValueFromPipeline, ValueFromPipelineByPropertyName)]
-    [Alias('Dir')]
-    [Alias('Path')]
-    [string[]] $ProjectDir,
-    [Parameter(ValueFromPipelineByPropertyName)]
-    [string] $OutputDir,
-    $CompilerPath,
-    $Server,
-    [switch] $Force,
-    [switch] $UseDependencyTempDir
+        [Parameter(Mandatory, ValueFromPipeline, ValueFromPipelineByPropertyName)]
+        [Alias('Dir')]
+        [Alias('Path')]
+        [string[]] $ProjectDir,
+        [Parameter(ValueFromPipelineByPropertyName)]
+        [string] $OutputDir,
+        $CompilerPath,
+        $Server,
+        [switch] $Force,
+        [switch] $UseDependencyTempDir,
+        [array] $AlcArgumentList
     )
 
     begin
@@ -673,7 +676,7 @@ function Invoke-AlProjectCompile
         {
             if (!$Projects.AppPath)
             {
-                Invoke-ProjectBuild -AppId $AppId -Projects $Projects -CompilerPath $CompilerPath -Force:$Force -Verbose:$Verbose -TempDirBase $TempDirBase -Server $Server -OnlyCompile
+                Invoke-ProjectBuild -AppId $AppId -Projects $Projects -CompilerPath $CompilerPath -Force:$Force -Verbose:$Verbose -TempDirBase $TempDirBase -Server $Server -OnlyCompile -AlcArgumentList $AlcArgumentList
             }
         }
         if ($UseDependencyTempDir -and (Test-Path $TempDirBase))
@@ -686,18 +689,20 @@ function Invoke-AlProjectCompile
 function Invoke-ProjectBuild
 {
     param(
-    [Parameter(Mandatory)]
-    [string] $AppId,
-    [Parameter(Mandatory)]
-    [hashtable] $Projects,
-    [string] $CompilerPath,
-    $Server,
-    [switch] $Force,
-    $TempDirBase,
-    [switch] $OnlyCompile,
-    [string] $SignToolPath,
-    [array] $SignToolArgumentList,
-    [switch] $RunALCops    )
+        [Parameter(Mandatory)]
+        [string] $AppId,
+        [Parameter(Mandatory)]
+        [hashtable] $Projects,
+        [string] $CompilerPath,
+        $Server,
+        [switch] $Force,
+        $TempDirBase,
+        [switch] $OnlyCompile,
+        [string] $SignToolPath,
+        [array] $SignToolArgumentList,
+        [switch] $RunALCops,
+        [array] $AlcArgumentList
+    )
     $verbose = [bool]$PSBoundParameters["Verbose"]
     Write-Verbose "Building: `"$($Projects[$AppId].ProjectDir)`" `"$AppId`"."
     if ($Projects[$AppId].Package)
@@ -719,7 +724,7 @@ function Invoke-ProjectBuild
         if (!$Projects[$Dependency.id].AppPath)
         {
             Write-Verbose "Need to compile dependency `"$($Dependency.id)`" first."
-            Invoke-ProjectBuild -AppId $Dependency.id -Projects $Projects -CompilerPath $CompilerPath -Verbose:$Verbose -Force:$Force -TempDirBase $TempDirBase -Server $Server -OnlyCompile:$OnlyCompile -SignToolPath $SignToolPath -SignToolArgumentList $SignToolArgumentList -RunALCops:$RunALCops
+            Invoke-ProjectBuild -AppId $Dependency.id -Projects $Projects -CompilerPath $CompilerPath -Verbose:$Verbose -Force:$Force -TempDirBase $TempDirBase -Server $Server -OnlyCompile:$OnlyCompile -SignToolPath $SignToolPath -SignToolArgumentList $SignToolArgumentList -RunALCops:$RunALCops -AlcArgumentList $AlcArgumentList
             Write-Verbose "Continuing with `"$AppId`"."
         }
 
@@ -846,6 +851,7 @@ function Invoke-ProjectBuild
             AlPackagesDir = $AlPackagesDir
             Verbose = $Verbose
             RunALCops = $RunALCops
+            AlcArgumentList = $AlcArgumentList
         }
 
         if ($OnlyCompile -and $Projects[$AppId].OutputDir)
@@ -861,12 +867,21 @@ function Invoke-ProjectBuild
     {
         $app = $Projects[$AppId].AppPath
         Write-Verbose "File being signed: $app"
-        & $SignToolPath $SignToolArgumentList $app
+        $Output = & $SignToolPath $SignToolArgumentList $app | Out-String
+        if ($LASTEXITCODE -ne 0)
+        {
+            if ($Output)
+            {
+                Write-Warning $Output
+            }
+            Write-Error "Signing failed with exit code $LASTEXITCODE."
+            return
+        }
         $SignStatus = (Get-AuthenticodeSignature $app).status
-        Write-Verbose "Signing status of $app : $SignStatus"
         if ($SignStatus -ne 'Valid')
         {
-            Write-Error Signed failed
+            Write-Error "File not succesfully signed, status after signing: $SignStatus"
+            return
         }
     }
 
@@ -891,30 +906,30 @@ function Invoke-ProjectBuild
 function Invoke-AlProjectBuild
 {
     <#
-    .SYNOPSIS
-    Build specified al project
+        .SYNOPSIS
+            Build specified al project
 
-    .PARAMETER ProjectDir
-    Specify the project directory (or repository directory).
+        .PARAMETER ProjectDir
+            Specify the project directory (or repository directory).
 
-    .PARAMETER BranchName
-    Specify the Git branch name for you repository (if appropriate).
+        .PARAMETER BranchName
+            Specify the Git branch name for you repository (if appropriate).
 
-    .PARAMETER Target
-    Specify a target to compile against. Can be used to resolve
-    different dependencies for release, release candidate and development.
+        .PARAMETER Target
+            Specify a target to compile against. Can be used to resolve
+            different dependencies for release, release candidate and development.
 
-    .PARAMETER Variables
-    Specify a hashtable of variables to make available for project file.
-    The values specified here, will overwrite any variables specified
-    in the project file.
+        .PARAMETER Variables
+            Specify a hashtable of variables to make available for project file.
+            The values specified here, will overwrite any variables specified
+            in the project file.
 
-    .PARAMETER OutputDir
-    Specifies the output directory for the package and artifacts.
+        .PARAMETER OutputDir
+            Specifies the output directory for the package and artifacts.
 
-    .PARAMETER CompilerPath
-    Specifies a path to the AL compiler (alc.exe). If not specified,
-    it will install the bc-al-compiler package and use to compile.
+        .PARAMETER CompilerPath
+            Specifies a path to the AL compiler (alc.exe). If not specified,
+            it will install the bc-al-compiler package and use to compile.
 
         .PARAMETER SignToolPath
             Specifies a path to the sign tool that will be used to sign apps.
@@ -927,30 +942,31 @@ function Invoke-AlProjectBuild
             Refer here for more clarification on signtool paramater list:
             https://learn.microsoft.com/en-us/windows/win32/seccrypto/signtool
 
-    .PARAMETER Force
-    If specified, it will overwrite any existing files.
+        .PARAMETER Force
+            If specified, it will overwrite any existing files.
     #>
     [CmdletBinding()]
     param(
-    [Parameter(Mandatory, ValueFromPipeline, ValueFromPipelineByPropertyName)]
-    [Alias('Dir')]
-    [Alias('Path')]
-    [string[]] $ProjectDir,
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $BranchName,
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $Target,
-    [Parameter(ValueFromPipelineByPropertyName)]
-    [hashtable] $Variables,
-    [Parameter(ValueFromPipelineByPropertyName)]
-    [string] $OutputDir,
-    $CompilerPath,
-    $Server,
+        [Parameter(Mandatory, ValueFromPipeline, ValueFromPipelineByPropertyName)]
+        [Alias('Dir')]
+        [Alias('Path')]
+        [string[]] $ProjectDir,
+        [Parameter(ValueFromPipelineByPropertyName)]
+        $BranchName,
+        [Parameter(ValueFromPipelineByPropertyName)]
+        $Target,
+        [Parameter(ValueFromPipelineByPropertyName)]
+        [hashtable] $Variables,
+        [Parameter(ValueFromPipelineByPropertyName)]
+        [string] $OutputDir,
+        $CompilerPath,
+        $Server,
         [string] $SignToolPath,
         [array] $SignToolArgumentList,
-    [switch] $Force,
-    [switch] $UseDependencyTempDir,
-    [switch] $RunALCops
+        [switch] $Force,
+        [switch] $UseDependencyTempDir,
+        [switch] $RunALCops,
+        [string[]] $AlcArgumentList
     )
     begin
     {
@@ -988,7 +1004,7 @@ function Invoke-AlProjectBuild
         {
             if (!$Projects[$AppId].AppPath)
             {
-                Invoke-ProjectBuild -AppId $AppId -Projects $Projects -CompilerPath $CompilerPath -Force:$Force -Verbose:$Verbose -TempDirBase $TempDirBase -Server $Server -SignToolPath $SignToolPath -SignToolArgumentList $SignToolArgumentList -RunALCops:$RunALCops
+                Invoke-ProjectBuild -AppId $AppId -Projects $Projects -CompilerPath $CompilerPath -Force:$Force -Verbose:$Verbose -TempDirBase $TempDirBase -Server $Server -SignToolPath $SignToolPath -SignToolArgumentList $SignToolArgumentList -RunALCops:$RunALCops -AlcArgumentList $AlcArgumentList
             }
         }
         if ($UseDependencyTempDir -and (Test-Path $TempDirBase))
@@ -1025,7 +1041,11 @@ function New-AlProjectPackage
         Variables = $Variables
     }
 
-    New-AlPackage @Arguments
+    $Package = New-AlPackage @Arguments
+    $Package | Add-Member -NotePropertyName 'AppPath' -NotePropertyValue $AppPath
+    $Package | Add-Member -NotePropertyName 'ProjectDir' -NotePropertyValue $ProjectDir
+    $Package | Add-Member -NotePropertyName 'Target' -NotePropertyValue $Target
+    $Package
 }
 
 function Undo-AlVersion

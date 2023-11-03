@@ -75,17 +75,20 @@ if ($GitCommit -and $BuildNumber)
     Set-Content -Path (Join-Path $PSScriptRoot 'commit') -Value $GitCommit
     if ($Branch -eq $ReleaseBranch)
     {
+        Write-host 'Release branch'
         $Version = "$Version"
     }
     else
     {
+        Write-Host "Branch: $Branch"
         $BranchName = ConvertTo-PackageBranchName -GitBranchName $Branch
         $Version = "$Version-dev.$BranchName.$BuildNumber+$GitCommit"
     }
-
+    Write-Host $Version
     $NewPackageContent = $PackageContent.Replace([string]$PackageJson.version, [string]$Version)
     Set-Content -Value $NewPackageContent -Path (Join-Path $PSScriptRoot 'package.json')
 }
+
 Push-Location
 Set-Location $PSScriptRoot
 if (!$Vsce -or !(Test-Path $Vsce))

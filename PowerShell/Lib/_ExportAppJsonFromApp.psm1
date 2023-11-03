@@ -29,8 +29,7 @@ function Export-ArchiveFromApp
     }
     catch
     {
-        Write-Warning "$_"
-        throw "Unsupported format."
+        throw "Unsupported file format: $Path"
     }
     finally 
     {
@@ -66,6 +65,15 @@ function Get-AppJsonFromApp
         Expand-NavxManifestFromArchive -Path $ArchivePath -OutputPath $NavxManifestPath
     
         ConvertTo-AppJson -Path $NavxManifestPath    
+    }
+    catch
+    {
+        $Manifest = Get-AppJsonFromRuntimeApp -Path $Path
+        if (!$Manifest)
+        {
+            throw
+        }
+        return $Manifest
     }
     finally
     {
@@ -153,4 +161,74 @@ function Convert-AttributesToHashtable
         $Content[$Item.Name] = $Item.Value
     }
     $Content
+}
+
+function Get-Compiler
+{
+    param(
+        $InstanceName = 'AlCompiler'
+    )
+
+    $PackageId = 'bc-al-compiler'
+
+    $InstalledPackage = Get-GocInstalledPackage -InstanceName $InstanceName -Id $PackageId
+    return $InstalledPackage.Info.CompilerPath
+}
+
+function Get-CodeAnalysisPath
+{
+    $CompilerPath = Get-Compiler
+    if ($CompilerPath)
+    {
+        return Join-Path (Split-Path ($CompilerPath) -Parent) "Microsoft.Dynamics.Nav.CodeAnalysis.dll"
+    }
+}
+
+function Get-AppJsonFromRuntimeApp
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        $Path
+    )
+
+    $codeAnalyisPath = Get-CodeAnalysisPath
+    if (!$codeAnalyisPath)
+    {
+        return $null
+    }
+    Import-Module $codeAnalyisPath
+    
+    $stream = [System.IO.File]::OpenRead($Path)
+    try
+    {
+        $navAppPackageReader = [Microsoft.Dynamics.Nav.CodeAnalysis.Packaging.NavAppPackageReader]::Create($stream)
+        $manifest = $navAppPackageReader.ReadNavAppManifest()
+    }
+    catch
+    {
+        Write-Warning "$_"
+        return $null
+    }
+    finally
+    {
+        $stream.Dispose()
+    }
+    
+    return @{
+        Id = $manifest.AppId.ToString()
+        Version = $manifest.AppVersion.ToString()
+        Name = $manifest.AppName
+        Description = $manifest.AppDescription
+        Publisher = $manifest.AppPublisher
+        Application = $manifest.Application
+        Platform = $manifest.Platform
+        Dependencies = @($manifest.Dependencies | Foreach-Object {
+            @{ 
+                AppId = $_.AppId.ToString();
+                Version = $_.Version.ToString()
+                Name = $_.Name
+                Publisher = $_.Publisher
+            }
+        })
+    }
 }
