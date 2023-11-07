@@ -1,6 +1,17 @@
 # Change Log
 All notable changes to the "LS Retail Update Service Workspace" extension will be documented in this file.
 
+## [1.7.2]
+### Changed
+- Added .bclicense to license dialog when creating a new project.
+- The resolve package version, variable function, now includes the package to resolve, in case it is an optional dependency.
+
+## [1.7.0]
+### Added
+- Added a variable function to resolve package version from a package ID and version query, in gocurrent.json.
+- Support chaining of variable functions, ${variable:func1:func2:func3}
+- Added variable functions: *NextMajor*, *CurrentMajor*, *NextMinor*, *CurrentMinor*, *NextPatch*, *NextPreRelease*.
+
 ## [1.6.3]
 ### Changed
 - The ability to remove dependency at compile time has been added through compile modifiers, by adding version for a package to 'skip'.

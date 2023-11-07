@@ -242,7 +242,7 @@ export class BaseUiService extends UiService
                 let licenseFile = await window.showOpenDialog({
                     canSelectFiles: true, 
                     defaultUri: workspaceFolder.uri,
-                    filters: {License: ['flf']},
+                    filters: {'License files (*.flf, *.bclicense)': ['flf', 'bclicense']},
                     title: "Select license file",
                     openLabel: "Select License"
                 });

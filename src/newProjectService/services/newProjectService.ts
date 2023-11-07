@@ -197,7 +197,7 @@ export class NewProjectService
             let version = new VersionFromAlApp();
             version.alAppId = 'application';
             version.alAppIdType = 'fromMinor';
-            version.alAppParts = 3
+            version.alAppIdParts = 3
             newDep.version = version;
             projectFile.dependencies.push(newDep);
         }
@@ -210,7 +210,7 @@ export class NewProjectService
             let version = new VersionFromAlApp();
             version.alAppId = 'platform';
             version.alAppIdType = 'fromMinor';
-            version.alAppParts = 3
+            version.alAppIdParts = 3
             newDep.version = version;
             projectFile.dependencies.push(newDep);
         }
@@ -222,21 +222,21 @@ export class NewProjectService
             if (this._appIdToPackageMap[newApp])
             {
                 newDep.id = this._appIdToPackageMap[newApp];
-                version.alAppParts = 3
+                version.alAppIdParts = 3
                 if (existingIds.includes(newDep.id))
                     continue;
             }
             else if (appIdToPackageIdMap[newApp])
             {
                 newDep.id = appIdToPackageIdMap[newApp];
-                version.alAppParts = 4
+                version.alAppIdParts = 4
                 if (existingIds.includes(newDep.id))
                     continue;
             }
             else
             {
                 newDep.id = "set-package-id-for-app-id"
-                version.alAppParts = 4
+                version.alAppIdParts = 4
             }
             
             version.alAppId = newApp;

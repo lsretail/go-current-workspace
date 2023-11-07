@@ -53,7 +53,7 @@ export class ProjectFilePackage
 export class VersionFromAlApp
 {
     alAppId: string;
-    alAppParts: number;
+    alAppIdParts: number;
     alAppIdType: string;
 }
 
