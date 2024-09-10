@@ -38,14 +38,6 @@
                     "version": ""
                 },
                 {
-                    "id": "ls-central-toolbox-server",
-                    "version": "${lsCentralVersion}"
-                },
-                {
-                    "id": "ls-dd-server-addin",
-                    "version": "^"
-                },
-                {
                     "id": "map/ls-central-to-bc",
                     "version": "${lsCentralVersion}"
                 }

@@ -37,6 +37,9 @@ export class AlExtensionService
         if (!this._extension)
             return undefined;
 
+        let compilerPath = path.join(this._extension.extensionPath, 'bin', 'win32', 'alc.exe')
+        if (fsHelpers.existsSync(compilerPath))
+            return compilerPath
         return path.join(this._extension.extensionPath, 'bin', 'alc.exe')
     }
 

@@ -42,8 +42,7 @@ function Invoke-UpgradeData
         return (ConvertTo-Json @() -Compress)
     }
 
-    $ModuleDir = Get-BcModuleDir -InstanceName $InstanceName
-    Import-Module (Join-Path $ModuleDir 'Microsoft.Dynamics.Nav.Apps.Management.dll')
+    Import-Module (Get-BcModulePath -InstanceName $InstanceName -Type Apps) -Global
 
     $Apps = Get-NAVAppInfo -ServerInstance $Server.Info.ServerInstance -TenantSpecificProperties -Tenant default
     $Apps = $Apps | Where-Object { $_.ExtensionDataVersion -ne $_.Version}
@@ -107,8 +106,7 @@ function Invoke-UnpublishApp
         Write-JsonError -Message "Instance doesn't exists `"$InstanceName`"." -Type 'User'
     }
 
-    $ModuleDir = Get-BcModuleDir -InstanceName $InstanceName
-    Import-Module (Join-Path $ModuleDir 'Microsoft.Dynamics.Nav.Apps.Management.dll')
+    Import-Module (Get-BcModulePath -InstanceName $InstanceName -Type Apps) -Global
 
     $ServerInstance = $Server.Info.ServerInstance
 
@@ -173,8 +171,7 @@ function Invoke-ImportLicense
         Write-JsonError -Message "Instance doesn't exists `"$InstanceName`"." -Type 'User'
     }
 
-    $ModuleDir = Get-BcModuleDir -InstanceName $InstanceName
-    Import-Module (Join-Path $ModuleDir 'Microsoft.Dynamics.Nav.Management.dll')
+    Import-Module (Get-BcModulePath -InstanceName $InstanceName -Type Management) -Global
 
     $ServerInstance = $Server.Info.ServerInstance
 
@@ -229,8 +226,7 @@ function Publish-App
         Write-JsonError -Message "Instance doesn't exists `"$InstanceName`"." -Type 'User'
     }
 
-    $ModuleDir = Get-BcModuleDir -InstanceName $InstanceName
-    Import-Module (Join-Path $ModuleDir 'Microsoft.Dynamics.Nav.Apps.Management.dll')
+    Import-Module (Get-BcModulePath -InstanceName $InstanceName -Type Apps) -Global
 
     $SyncMode = 'Development'
     $AllowForceSync = $true
@@ -297,4 +293,63 @@ function Get-BcModuleDir
         return Join-Path $ServerDir 'Management'
     }
     return $ServerDir
+}
+
+function Get-BcModulePath
+{
+    param(
+        [Parameter(Mandatory, ParameterSetName='ServerDir')]
+        [string] $ServerDir,
+        [Parameter(Mandatory, ParameterSetName='InstanceName')]
+        [string] $InstanceName,
+        [ValidateSet('Apps', 'Management')]
+        [string] $Type
+    )
+
+    if ($InstanceName)
+    {
+        $BcServer = Get-UscInstalledPackage -Id 'bc-server' -InstanceName $InstanceName
+
+        if (!$BcServer)
+        {
+            throw "Specified instance ($InstanceName) does not exists or is not a Business Central instance."
+        }
+
+        $ServerDir = $BcServer.Info.ServerDir
+    }
+
+    if ($Type -eq 'Apps')
+    {
+        $Paths = @(
+            (Join-Path $ServerDir 'Microsoft.Dynamics.Nav.Apps.Management.dll')
+            (Join-Path $ServerDir 'Management\Microsoft.Dynamics.Nav.Apps.Management.dll')
+            (Join-Path $ServerDir 'Management\Microsoft.Dynamics.Nav.Management.dll')
+        )
+        return Get-FirstExisting $Paths
+    }
+    elseif ($Type -eq 'Management')
+    {
+        $Paths = @(
+            (Join-Path $ServerDir 'Microsoft.Dynamics.Nav.Management.dll')
+            (Join-Path $ServerDir 'Management\Microsoft.Dynamics.Nav.Management.dll')
+        )
+        return Get-FirstExisting $Paths
+    }
+    throw 'Invalid type specified.'
+}
+
+function Get-FirstExisting
+{
+    param(
+        [string[]]$Path
+    )
+
+    foreach ($Path in $Paths)
+    {
+        if (Test-Path $Path)
+        {
+            return $Path
+        }
+    }
+    throw 'None of the specified paths exists.'
 }
