@@ -4,7 +4,7 @@ import {PackageInfo} from '../../interfaces/packageInfo';
 import { Server, Package } from '../../models/projectFile';
 import { GoCurrentVersion } from '../../interfaces/goCurrentVersion';
 import { Event, EventEmitter } from 'vscode';
-import { PackageWithName } from '../interfaces/PackageWithName';
+import { PackageWithName } from '../interfaces/packageWithName';
 
 export class GoCurrentPsService
 {
@@ -75,7 +75,7 @@ export class GoCurrentPsService
 
         if (!isInitialized)
             this._onDidInitialize.fire(this);
-            
+
         return gocVersion;
     }
 

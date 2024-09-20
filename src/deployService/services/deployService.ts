@@ -33,7 +33,7 @@ export class DeployService implements IWorkspaceService
     public UpdatesAvailable: Array<UpdateAvailable> = [];
 
     public constructor(
-        projectFile: JsonData<ProjectFile>, 
+        projectFile: JsonData<ProjectFile>,
         workspaceData: JsonData<WorkspaceData>,
         deployPsService: DeployPsService,
         goCurrentPsService: GoCurrentPsService,
@@ -157,7 +157,7 @@ export class DeployService implements IWorkspaceService
                     packages.push(packageEntry);
                 }
             }
-            item.packages = packages;      
+            item.packages = packages;
             return item;
         }
     }
@@ -184,16 +184,16 @@ export class DeployService implements IWorkspaceService
     public getDeployments() : Thenable<Array<Deployment>>
     {
         return this._workspaceData.getData().then(workspaceData => {
-            return workspaceData.deployments; 
+            return workspaceData.deployments;
         });
     }
 
     public async removeDeployment(guid: string) : Promise<string>
     {
         let removedName = await this._deployPsService.removeDeployment(this._workspaceData.uri.fsPath, guid);
-            
+
         await this.removeDeploymentFromData(guid);
-        
+
         return removedName
     }
 
@@ -207,7 +207,7 @@ export class DeployService implements IWorkspaceService
             this.fireInstanceRemoved(deployment.instanceName);
     }
 
-    public async updatePackage( 
+    public async updatePackage(
         deployment: Deployment,
     ) : Promise<Deployment>
     {
@@ -223,8 +223,8 @@ export class DeployService implements IWorkspaceService
     }
 
     public async deployPackageGroup(
-        packageGroup: PackageGroup, 
-        instanceName: string, 
+        packageGroup: PackageGroup,
+        instanceName: string,
         target: string = undefined,
         deploymentGuid: string = undefined,
     ) : Promise<DeploymentResult>
@@ -275,7 +275,7 @@ export class DeployService implements IWorkspaceService
         {
             let installed = DataHelpers.getEntryByProperty(packagesInstalled, "Id", packageFromGroup.id);
             let alreadyInstalled = DataHelpers.getEntryByProperty(result.deployment.packages, "id", packageFromGroup.id);
-            
+
             if (installed && alreadyInstalled)
                 alreadyInstalled.version = installed.Version;
 
@@ -343,8 +343,8 @@ export class DeployService implements IWorkspaceService
     }
 
     public async installUpdate(
-        packageGroupId: string, 
-        instanceName: string, 
+        packageGroupId: string,
+        instanceName: string,
         guid: string
     ) : Promise<DeploymentResult>
     {
@@ -362,7 +362,7 @@ export class DeployService implements IWorkspaceService
             let update = await this.checkForUpdatesDeployment(deployment);
             if(update)
                 updates.push(update);
-            
+
         }
 
         return updates;
@@ -418,12 +418,12 @@ export class DeployService implements IWorkspaceService
     {
         let servers: Server[] = [];
         let target = deployment.target;
-        
+
         if (deployment.id)
         {
             let projectData = (await this._projectFile.getData());
             let packageGroup = this.getPackageGroup(projectData, deployment.id)
-            
+
             let devTarget = this.getDevTarget(projectData, packageGroup)
 
             if (devTarget.length === 1)
@@ -433,13 +433,13 @@ export class DeployService implements IWorkspaceService
 
             servers = await this.getServers(packageGroup);
         }
-        
+
         return await this._deployPsService.getAvailableUpdates(
-            this._projectFile.uri.fsPath, 
-            deployment.id, 
-            deployment.instanceName, 
-            GitHelpers.getBranchName(this._workspacePath), 
-            target, 
+            this._projectFile.uri.fsPath,
+            deployment.id,
+            deployment.instanceName,
+            GitHelpers.getBranchName(this._workspacePath),
+            target,
             servers
         );
     }
@@ -464,15 +464,30 @@ export class DeployService implements IWorkspaceService
 
     public async isInstance(packageGroupId: string) : Promise<boolean>
     {
-        let packageGroup = this.getPackageGroup((await this._projectFile.getData()), packageGroupId);
+        var projectFile = await this._projectFile.getData();
+        let packageGroup = this.getPackageGroup(projectFile, packageGroupId);
         let servers = await this.getServers(packageGroup);
 
-        return await this._deployPsService.testIsInstance(this._projectFile.uri.fsPath, packageGroupId, servers);
+        return await this._deployPsService.testIsInstance(
+            this._projectFile.uri.fsPath,
+            packageGroupId,
+            servers,
+            this.getDevTarget(projectFile, packageGroup)[0] ?? undefined,
+            GitHelpers.getBranchName(this._workspacePath)
+        );
     }
 
-    public canInstall(packageGroupId: string) : Promise<boolean>
+    public async canInstall(packageGroupId: string) : Promise<boolean>
     {
-        return this._deployPsService.testCanInstall(this._projectFile.uri.fsPath, packageGroupId);
+        var projectFile = await this._projectFile.getData();
+        let packageGroup = this.getPackageGroup(projectFile, packageGroupId);
+
+        return await this._deployPsService.testCanInstall(
+            this._projectFile.uri.fsPath,
+            packageGroupId,
+            this.getDevTarget(projectFile, packageGroup)[0] ?? undefined,
+            GitHelpers.getBranchName(this._workspacePath)
+        );
     }
 
     public getDeployedPackages(deploymentGuid: string) : Promise<PackageInfo[]>

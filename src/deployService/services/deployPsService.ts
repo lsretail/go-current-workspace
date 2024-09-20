@@ -14,7 +14,7 @@ export class DeployPsService
 
     constructor(powerShell: PowerShell, modulePath: string)
     {
-        this._powerShell = powerShell;    
+        this._powerShell = powerShell;
         this._modulePath = modulePath;
     }
 
@@ -103,8 +103,8 @@ export class DeployPsService
     }
 
     public getAvailableUpdates(
-        projectFilePath: string, 
-        packageGroupId: string, 
+        projectFilePath: string,
+        packageGroupId: string,
         instanceName: string,
         branchName: string,
         target: string,
@@ -120,13 +120,13 @@ export class DeployPsService
 
         if (instanceName)
             param['InstanceName'] = `'${instanceName}'`;
-        
+
         if (target)
             param['Target'] = `'${target}'`;
 
         if (branchName)
             param['BranchName'] = `'${branchName}'`;
-        
+
         if (servers)
             param['Servers'] = `'${JSON.stringify(servers)}'`;
 
@@ -160,16 +160,32 @@ export class DeployPsService
 
         if (branchName)
             param['BranchName'] = `'${branchName}'`;
-        
+
         if (servers)
             param['Servers'] = `'${JSON.stringify(servers)}'`;
-        
+
         return this.executeCommandSafe("Test-IsInstance", true, param);
     }
 
-    public testCanInstall(projectFilePath: string, packageGroupId: string): Promise<boolean>
+    public testCanInstall(
+        projectFilePath: string,
+        packageGroupId: string,
+        target?: string,
+        branchName?: string,
+    ): Promise<boolean>
     {
-        return this.executeCommandSafe("Test-CanInstall", true, {"ProjectFilePath": projectFilePath, "packageGroupId": packageGroupId})
+        const param = {
+            "ProjectFilePath": projectFilePath,
+            "packageGroupId": packageGroupId
+        }
+
+        if (target)
+            param['Target'] = `'${target}'`;
+
+        if (branchName)
+            param['BranchName'] = `'${branchName}'`;
+
+        return this.executeCommandSafe("Test-CanInstall", true, param);
     }
 
     public getDeployedPackages(workspaceDataPath: string, deploymentGuid: string) : Promise<PackageInfo[]>
